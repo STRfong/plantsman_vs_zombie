@@ -1,0 +1,1551 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="mobile-web-app-capable" content="yes">
+    <title>植物人大戰殭屍 🏥</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            -webkit-tap-highlight-color: transparent;
+        }
+
+        html, body {
+            overflow-x: hidden;
+            touch-action: manipulation;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+            background: linear-gradient(135deg, #e8f4f8 0%, #d0e8f0 100%);
+            min-height: 100vh;
+            min-height: -webkit-fill-available;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 10px;
+        }
+
+        h1 {
+            color: #2c5d63;
+            text-shadow: 2px 2px 4px rgba(0,0,0,0.1);
+            margin-bottom: 5px;
+            font-size: clamp(1.2em, 5vw, 2.5em);
+            text-align: center;
+        }
+
+        .subtitle {
+            color: #666;
+            margin-bottom: 10px;
+            font-style: italic;
+            font-size: clamp(0.7em, 2.5vw, 1em);
+            text-align: center;
+            padding: 0 10px;
+        }
+
+        .game-info {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 10px;
+            font-size: clamp(0.8em, 3vw, 1.2em);
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        .game-info span {
+            background: white;
+            padding: 8px 15px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+            white-space: nowrap;
+        }
+
+        .points {
+            color: #d4a017;
+            font-weight: bold;
+        }
+
+        .wave {
+            color: #c0392b;
+            font-weight: bold;
+        }
+
+        /* 遊戲容器 - 可滾動 */
+        #game-wrapper {
+            width: 100%;
+            max-width: 100vw;
+            overflow-x: auto;
+            overflow-y: hidden;
+            -webkit-overflow-scrolling: touch;
+            margin-bottom: 10px;
+        }
+
+        #game-container {
+            background: linear-gradient(to right, #f5f5f5 0%, #e0e0e0 100%);
+            border: 3px solid #2c5d63;
+            border-radius: 10px;
+            padding: 5px;
+            box-shadow: 0 5px 20px rgba(0,0,0,0.2);
+            position: relative;
+            overflow: hidden;
+            display: inline-block;
+            min-width: min-content;
+        }
+
+        #game-grid {
+            display: grid;
+            gap: 1px;
+            background: #ccc;
+        }
+
+        .cell {
+            background: linear-gradient(145deg, #ffffff 0%, #e8f4e8 100%);
+            border: 1px solid #aaa;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            cursor: pointer;
+            position: relative;
+            transition: background 0.2s;
+            touch-action: manipulation;
+        }
+
+        .cell:active, .cell.active {
+            background: linear-gradient(145deg, #d4edda 0%, #c3e6cb 100%);
+        }
+
+        .cell.occupied {
+            cursor: pointer;
+        }
+
+        .cell.shovel-target:active, .cell.shovel-target.active {
+            background: linear-gradient(145deg, #f8d7da 0%, #f5c6cb 100%) !important;
+        }
+
+        /* 植物人容器 */
+        .plant-wrapper {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            position: relative;
+        }
+
+        .plant {
+            animation: plantIdle 1s ease-in-out infinite;
+        }
+
+        @keyframes plantIdle {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-2px); }
+        }
+
+        .plant.attacking {
+            animation: plantAttack 0.3s ease-in-out;
+        }
+
+        @keyframes plantAttack {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.15); }
+        }
+
+        /* 血條 */
+        .hp-bar {
+            background: #333;
+            border-radius: 2px;
+            margin-top: 1px;
+            overflow: hidden;
+        }
+
+        .hp-bar-fill {
+            height: 100%;
+            background: linear-gradient(90deg, #27ae60, #2ecc71);
+            border-radius: 2px;
+            transition: width 0.2s;
+        }
+
+        .hp-bar-fill.medium {
+            background: linear-gradient(90deg, #f39c12, #f1c40f);
+        }
+
+        .hp-bar-fill.low {
+            background: linear-gradient(90deg, #c0392b, #e74c3c);
+        }
+
+        /* 殭屍 */
+        .zombie {
+            position: absolute;
+            transition: left 0.1s linear;
+            z-index: 10;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        @keyframes zombieWalk {
+            0%, 100% { transform: translateY(0) rotate(0deg); }
+            25% { transform: translateY(-2px) rotate(-3deg); }
+            75% { transform: translateY(-2px) rotate(3deg); }
+        }
+
+        .zombie-sprite {
+            animation: zombieWalk 0.5s ease-in-out infinite;
+        }
+
+        .zombie.slowed .zombie-sprite {
+            filter: hue-rotate(180deg);
+            animation-duration: 1s;
+        }
+
+        .zombie.frozen .zombie-sprite {
+            filter: brightness(1.5) saturate(0.5);
+            animation: none;
+        }
+
+        .zombie.boss .hp-bar-fill {
+            background: linear-gradient(90deg, #8e44ad, #9b59b6);
+        }
+
+        /* 子彈 */
+        .bullet {
+            position: absolute;
+            z-index: 5;
+            animation: bulletFly 0.1s linear infinite;
+        }
+
+        @keyframes bulletFly {
+            0%, 100% { transform: scale(1); }
+            50% { transform: scale(1.1); }
+        }
+
+        /* 選擇欄 */
+        #selection-bar {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 5px;
+            padding: 10px;
+            background: white;
+            border-radius: 10px;
+            box-shadow: 0 3px 15px rgba(0,0,0,0.1);
+            width: 100%;
+            max-width: 900px;
+            justify-content: center;
+            align-items: stretch;
+        }
+
+        .plant-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 6px 4px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: linear-gradient(145deg, #fff 0%, #f0f0f0 100%);
+            position: relative;
+            overflow: hidden;
+            flex: 0 0 auto;
+            touch-action: manipulation;
+        }
+
+        .plant-card:active {
+            transform: scale(0.95);
+        }
+
+        .plant-card.selected {
+            border-color: #27ae60;
+            background: linear-gradient(145deg, #d4edda 0%, #c3e6cb 100%);
+            box-shadow: 0 0 10px rgba(39, 174, 96, 0.5);
+        }
+
+        .plant-card.disabled {
+            opacity: 0.4;
+            pointer-events: none;
+        }
+
+        /* 冷卻遮罩 */
+        .cooldown-overlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.6);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: white;
+            font-weight: bold;
+            border-radius: 6px;
+            pointer-events: none;
+        }
+
+        .cooldown-overlay.hidden {
+            display: none;
+        }
+
+        .plant-card .emoji {
+            margin-bottom: 2px;
+        }
+
+        .plant-card .name {
+            font-weight: bold;
+            color: #333;
+            text-align: center;
+            white-space: nowrap;
+        }
+
+        .plant-card .cost {
+            color: #d4a017;
+            font-weight: bold;
+        }
+
+        .plant-card .cd-info {
+            color: #888;
+        }
+
+        /* 鏟子 */
+        .shovel-card {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            padding: 6px 8px;
+            border: 2px solid #ddd;
+            border-radius: 8px;
+            cursor: pointer;
+            transition: all 0.2s;
+            background: linear-gradient(145deg, #fff 0%, #f0f0f0 100%);
+            touch-action: manipulation;
+        }
+
+        .shovel-card:active {
+            transform: scale(0.95);
+        }
+
+        .shovel-card.selected {
+            border-color: #c0392b;
+            background: linear-gradient(145deg, #f8d7da 0%, #f5c6cb 100%);
+            box-shadow: 0 0 10px rgba(192, 57, 43, 0.5);
+        }
+
+        .shovel-card .name {
+            font-weight: bold;
+            color: #333;
+        }
+
+        .shovel-card .info {
+            color: #888;
+        }
+
+        /* 按鈕 */
+        #controls {
+            margin-top: 10px;
+            display: flex;
+            gap: 10px;
+            flex-wrap: wrap;
+            justify-content: center;
+        }
+
+        button {
+            padding: 12px 25px;
+            font-size: clamp(0.9em, 3vw, 1.1em);
+            border: none;
+            border-radius: 10px;
+            cursor: pointer;
+            transition: all 0.2s;
+            font-weight: bold;
+            touch-action: manipulation;
+        }
+
+        button:active {
+            transform: scale(0.95);
+        }
+
+        #start-btn {
+            background: linear-gradient(145deg, #27ae60 0%, #2ecc71 100%);
+            color: white;
+        }
+
+        #restart-btn {
+            background: linear-gradient(145deg, #e74c3c 0%, #c0392b 100%);
+            color: white;
+        }
+
+        /* 遊戲結束畫面 */
+        #game-over {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.8);
+            display: none;
+            align-items: center;
+            justify-content: center;
+            z-index: 100;
+            padding: 20px;
+        }
+
+        #game-over.show {
+            display: flex;
+        }
+
+        #game-over-content {
+            background: white;
+            padding: 30px;
+            border-radius: 20px;
+            text-align: center;
+            animation: popIn 0.5s ease-out;
+            max-width: 90vw;
+        }
+
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+
+        #game-over-content h2 {
+            font-size: clamp(1.5em, 6vw, 3em);
+            margin-bottom: 15px;
+        }
+
+        #game-over-content p {
+            font-size: clamp(0.9em, 3vw, 1.3em);
+            color: #666;
+            margin-bottom: 20px;
+        }
+
+        .win h2 { color: #27ae60; }
+        .lose h2 { color: #c0392b; }
+
+        /* 說明 - 手機上隱藏 */
+        .instructions {
+            margin-top: 15px;
+            padding: 12px 20px;
+            background: white;
+            border-radius: 10px;
+            max-width: 900px;
+            font-size: 0.85em;
+            color: #555;
+            line-height: 1.5;
+            width: 100%;
+        }
+
+        .instructions h3 {
+            color: #2c5d63;
+            margin-bottom: 8px;
+        }
+
+        /* 特效 */
+        .heal-effect, .money-effect, .remove-effect {
+            position: absolute;
+            pointer-events: none;
+            z-index: 20;
+        }
+
+        .heal-effect {
+            animation: healFloat 1s ease-out forwards;
+        }
+
+        @keyframes healFloat {
+            0% { opacity: 1; transform: translateY(0); }
+            100% { opacity: 0; transform: translateY(-20px); }
+        }
+
+        .money-effect {
+            color: #d4a017;
+            font-weight: bold;
+            animation: moneyFloat 1s ease-out forwards;
+        }
+
+        @keyframes moneyFloat {
+            0% { opacity: 1; transform: translateY(0) scale(1); }
+            100% { opacity: 0; transform: translateY(-20px) scale(1.2); }
+        }
+
+        .remove-effect {
+            animation: removeFloat 0.5s ease-out forwards;
+        }
+
+        @keyframes removeFloat {
+            0% { opacity: 1; transform: scale(1) rotate(0deg); }
+            100% { opacity: 0; transform: scale(0.5) rotate(180deg); }
+        }
+
+        /* BOSS 警告 */
+        .boss-warning {
+            position: fixed;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            font-size: clamp(1.5em, 6vw, 3em);
+            color: #c0392b;
+            text-shadow: 0 0 20px rgba(192, 57, 43, 0.8);
+            animation: bossWarn 0.5s ease-in-out 3;
+            z-index: 50;
+            white-space: nowrap;
+        }
+
+        @keyframes bossWarn {
+            0%, 100% { transform: translate(-50%, -50%) scale(1); }
+            50% { transform: translate(-50%, -50%) scale(1.2); }
+        }
+
+        /* ==================== RWD 斷點 ==================== */
+
+        /* 大螢幕 (桌面) */
+        @media (min-width: 900px) {
+            .plant-card {
+                min-width: 75px;
+                padding: 8px 6px;
+            }
+            .plant-card .emoji { font-size: 1.8em; }
+            .plant-card .name { font-size: 0.7em; }
+            .plant-card .cost { font-size: 0.65em; }
+            .plant-card .cd-info { font-size: 0.55em; }
+            .cooldown-overlay { font-size: 1.4em; }
+            .shovel-card .emoji { font-size: 1.8em; }
+            .shovel-card .name { font-size: 0.75em; }
+            .shovel-card .info { font-size: 0.6em; }
+        }
+
+        /* 中螢幕 (平板) */
+        @media (min-width: 600px) and (max-width: 899px) {
+            .plant-card {
+                min-width: 65px;
+                padding: 6px 4px;
+            }
+            .plant-card .emoji { font-size: 1.5em; }
+            .plant-card .name { font-size: 0.6em; }
+            .plant-card .cost { font-size: 0.55em; }
+            .plant-card .cd-info { font-size: 0.5em; }
+            .cooldown-overlay { font-size: 1.2em; }
+            .shovel-card .emoji { font-size: 1.5em; }
+            .shovel-card .name { font-size: 0.65em; }
+            .shovel-card .info { font-size: 0.55em; }
+            .instructions { display: none; }
+        }
+
+        /* 小螢幕 (手機) */
+        @media (max-width: 599px) {
+            body { padding: 5px; }
+
+            .plant-card {
+                min-width: 55px;
+                padding: 5px 3px;
+            }
+            .plant-card .emoji { font-size: 1.3em; }
+            .plant-card .name { font-size: 0.55em; }
+            .plant-card .cost { font-size: 0.5em; }
+            .plant-card .cd-info { font-size: 0.45em; }
+            .cooldown-overlay { font-size: 1em; }
+            .shovel-card .emoji { font-size: 1.3em; }
+            .shovel-card .name { font-size: 0.6em; }
+            .shovel-card .info { font-size: 0.5em; }
+
+            #selection-bar {
+                gap: 4px;
+                padding: 8px;
+            }
+
+            .instructions { display: none; }
+
+            button {
+                padding: 10px 20px;
+            }
+        }
+
+        /* 極小螢幕 */
+        @media (max-width: 400px) {
+            .plant-card {
+                min-width: 48px;
+                padding: 4px 2px;
+            }
+            .plant-card .emoji { font-size: 1.1em; }
+            .plant-card .name { font-size: 0.5em; }
+            .plant-card .cost { font-size: 0.45em; }
+            .plant-card .cd-info { display: none; }
+            .shovel-card .emoji { font-size: 1.1em; }
+            .shovel-card .info { display: none; }
+
+            #selection-bar { gap: 3px; padding: 6px; }
+        }
+
+        /* 橫向手機模式提示 */
+        .landscape-hint {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            background: #2c5d63;
+            color: white;
+            text-align: center;
+            padding: 8px;
+            z-index: 200;
+            font-size: 0.85em;
+        }
+
+        @media (max-width: 700px) and (orientation: portrait) {
+            .landscape-hint { display: block; }
+        }
+    </style>
+</head>
+<body>
+    <div class="landscape-hint">📱 橫向使用體驗更佳！</div>
+
+    <h1>🏥 植物人大戰殭屍 🧟</h1>
+    <p class="subtitle">「當醫院被入侵，只有躺著的勇士能拯救世界...」</p>
+
+    <div class="game-info">
+        <span class="points">💰 <span id="points">200</span></span>
+        <span class="wave">🌊 <span id="wave">0</span>/7</span>
+    </div>
+
+    <div id="game-wrapper">
+        <div id="game-container">
+            <div id="game-grid"></div>
+        </div>
+    </div>
+
+    <div id="selection-bar">
+        <div class="shovel-card" id="shovel-card">
+            <span class="emoji">🪏</span>
+            <span class="name">鏟子</span>
+            <span class="info">回收50%</span>
+        </div>
+    </div>
+
+    <div id="controls">
+        <button id="start-btn">▶️ 開始</button>
+        <button id="restart-btn">🔄 重來</button>
+    </div>
+
+    <div class="instructions">
+        <h3>📖 遊戲說明</h3>
+        <p>
+            <strong>目標：</strong>阻止殭屍到達左側！撐過 7 波即可獲勝。<br>
+            <strong>操作：</strong>選擇角色卡 → 點格子放置。鏟子可移除植物人回收 50%。<br>
+            <strong>提示：</strong>手機建議橫向遊玩，可左右滑動查看完整地圖。
+        </p>
+    </div>
+
+    <div id="game-over">
+        <div id="game-over-content">
+            <h2 id="result-text">遊戲結束</h2>
+            <p id="result-message"></p>
+            <button id="play-again-btn">🔄 再玩一次</button>
+        </div>
+    </div>
+
+    <script>
+        // ==================== 動態計算尺寸 ====================
+        function calculateSizes() {
+            const screenWidth = window.innerWidth;
+            const screenHeight = window.innerHeight;
+            const isPortrait = screenHeight > screenWidth;
+
+            let cellSize, gridCols, gridRows;
+
+            if (screenWidth >= 900) {
+                // 桌面
+                cellSize = 60;
+                gridCols = 12;
+                gridRows = 6;
+            } else if (screenWidth >= 600) {
+                // 平板
+                cellSize = 50;
+                gridCols = 10;
+                gridRows = 5;
+            } else if (screenWidth >= 400) {
+                // 手機
+                cellSize = isPortrait ? 40 : 45;
+                gridCols = isPortrait ? 9 : 10;
+                gridRows = 5;
+            } else {
+                // 小手機
+                cellSize = isPortrait ? 35 : 40;
+                gridCols = isPortrait ? 8 : 9;
+                gridRows = 5;
+            }
+
+            return { cellSize, gridCols, gridRows };
+        }
+
+        // ==================== 遊戲配置 ====================
+        let sizes = calculateSizes();
+
+        const CONFIG = {
+            get GRID_ROWS() { return sizes.gridRows; },
+            get GRID_COLS() { return sizes.gridCols; },
+            get CELL_SIZE() { return sizes.cellSize; },
+            INITIAL_POINTS: 200,
+            WAVE_INTERVAL: 18000,
+            TOTAL_WAVES: 7,
+            SHOVEL_REFUND: 0.5,
+
+            PLANTS: {
+                shooter: {
+                    emoji: '🛏️💉',
+                    name: '點滴槍手',
+                    cost: 100,
+                    hp: 100,
+                    damage: 25,
+                    attackInterval: 1400,
+                    range: 'row',
+                    bulletEmoji: '💉',
+                    cooldown: 5000
+                },
+                sunflower: {
+                    emoji: '🛏️😷',
+                    name: '氧氣罩手',
+                    cost: 50,
+                    hp: 80,
+                    produceInterval: 5000,
+                    produceAmount: 30,
+                    cooldown: 5000
+                },
+                wall: {
+                    emoji: '🦽🛡️',
+                    name: '輪椅擋板',
+                    cost: 50,
+                    hp: 500,
+                    cooldown: 4000
+                },
+                electric: {
+                    emoji: '🛏️⚡',
+                    name: '除顫器兵',
+                    cost: 175,
+                    hp: 100,
+                    damage: 45,
+                    attackInterval: 2000,
+                    range: 'area',
+                    cooldown: 8000
+                },
+                scalpel: {
+                    emoji: '🛏️🔪',
+                    name: '手術刀手',
+                    cost: 150,
+                    hp: 80,
+                    damage: 50,
+                    attackInterval: 2000,
+                    range: 'row',
+                    bulletEmoji: '🔪',
+                    cooldown: 6000
+                },
+                anesthesia: {
+                    emoji: '🛏️💤',
+                    name: '麻醉師',
+                    cost: 125,
+                    hp: 90,
+                    damage: 10,
+                    attackInterval: 2500,
+                    range: 'row',
+                    bulletEmoji: '💤',
+                    slowEffect: 0.5,
+                    slowDuration: 3000,
+                    cooldown: 7000
+                },
+                xray: {
+                    emoji: '🛏️☢️',
+                    name: 'X光射手',
+                    cost: 200,
+                    hp: 80,
+                    damage: 20,
+                    attackInterval: 1800,
+                    range: 'pierce',
+                    bulletEmoji: '☢️',
+                    cooldown: 10000
+                },
+                medic: {
+                    emoji: '🛏️❤️',
+                    name: '急救站',
+                    cost: 150,
+                    hp: 100,
+                    healAmount: 20,
+                    healInterval: 3000,
+                    healRange: 1,
+                    cooldown: 8000
+                },
+                freezer: {
+                    emoji: '🛏️🧊',
+                    name: '冷凍櫃',
+                    cost: 175,
+                    hp: 100,
+                    damage: 15,
+                    attackInterval: 3000,
+                    range: 'row',
+                    bulletEmoji: '🧊',
+                    freezeDuration: 2000,
+                    cooldown: 8000
+                },
+                bomb: {
+                    emoji: '🛏️💣',
+                    name: '氧氣瓶炸彈',
+                    cost: 125,
+                    hp: 100,
+                    damage: 150,
+                    explodeRange: 1.5,
+                    cooldown: 15000
+                }
+            },
+
+            ZOMBIES: {
+                normal: { emoji: '🧟', hp: 100, damage: 25, speed: 0.5, reward: 15 },
+                fast: { emoji: '🧟‍♂️💨', hp: 60, damage: 20, speed: 1, reward: 20 },
+                tank: { emoji: '🧟‍♀️💪', hp: 300, damage: 35, speed: 0.3, reward: 35 },
+                boss: { emoji: '👹', hp: 1500, damage: 60, speed: 0.2, reward: 200, isBoss: true }
+            }
+        };
+
+        // ==================== 遊戲狀態 ====================
+        let gameState = {
+            isRunning: false,
+            points: CONFIG.INITIAL_POINTS,
+            currentWave: 0,
+            selectedPlant: null,
+            shovelMode: false,
+            plants: [],
+            zombies: [],
+            bullets: [],
+            intervals: [],
+            bossSpawned: false,
+            cooldowns: {}
+        };
+
+        // ==================== DOM 元素 ====================
+        const gameGrid = document.getElementById('game-grid');
+        const gameContainer = document.getElementById('game-container');
+        const pointsDisplay = document.getElementById('points');
+        const waveDisplay = document.getElementById('wave');
+        const startBtn = document.getElementById('start-btn');
+        const restartBtn = document.getElementById('restart-btn');
+        const gameOverScreen = document.getElementById('game-over');
+        const gameOverContent = document.getElementById('game-over-content');
+        const resultText = document.getElementById('result-text');
+        const resultMessage = document.getElementById('result-message');
+        const playAgainBtn = document.getElementById('play-again-btn');
+        const selectionBar = document.getElementById('selection-bar');
+        const shovelCard = document.getElementById('shovel-card');
+
+        // ==================== 初始化 ====================
+        function initGame() {
+            sizes = calculateSizes();
+            const cellSize = CONFIG.CELL_SIZE;
+            const rows = CONFIG.GRID_ROWS;
+            const cols = CONFIG.GRID_COLS;
+
+            // 設置網格樣式
+            gameGrid.style.gridTemplateColumns = `repeat(${cols}, ${cellSize}px)`;
+            gameGrid.style.gridTemplateRows = `repeat(${rows}, ${cellSize}px)`;
+
+            // 建立網格
+            gameGrid.innerHTML = '';
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < cols; col++) {
+                    const cell = document.createElement('div');
+                    cell.className = 'cell';
+                    cell.style.fontSize = `${cellSize * 0.4}px`;
+                    cell.dataset.row = row;
+                    cell.dataset.col = col;
+
+                    // 觸控和點擊事件
+                    cell.addEventListener('click', (e) => {
+                        e.preventDefault();
+                        handleCellClick(row, col, cell);
+                    });
+                    cell.addEventListener('touchend', (e) => {
+                        e.preventDefault();
+                        handleCellClick(row, col, cell);
+                    });
+
+                    gameGrid.appendChild(cell);
+                }
+            }
+
+            createPlantCards();
+
+            gameState = {
+                isRunning: false,
+                points: CONFIG.INITIAL_POINTS,
+                currentWave: 0,
+                selectedPlant: null,
+                shovelMode: false,
+                plants: [],
+                zombies: [],
+                bullets: [],
+                intervals: [],
+                bossSpawned: false,
+                cooldowns: {}
+            };
+
+            Object.keys(CONFIG.PLANTS).forEach(type => {
+                gameState.cooldowns[type] = 0;
+            });
+
+            updateUI();
+            updatePlantCards();
+        }
+
+        function createPlantCards() {
+            const oldCards = selectionBar.querySelectorAll('.plant-card');
+            oldCards.forEach(card => card.remove());
+
+            Object.entries(CONFIG.PLANTS).forEach(([type, config]) => {
+                const card = document.createElement('div');
+                card.className = 'plant-card';
+                card.dataset.type = type;
+                card.dataset.cost = config.cost;
+
+                card.innerHTML = `
+                    <span class="emoji">${config.emoji}</span>
+                    <span class="name">${config.name}</span>
+                    <span class="cost">💰${config.cost}</span>
+                    <span class="cd-info">${config.cooldown / 1000}s</span>
+                    <div class="cooldown-overlay hidden"></div>
+                `;
+
+                card.addEventListener('click', (e) => {
+                    e.preventDefault();
+                    handlePlantCardClick(type, config.cost);
+                });
+                card.addEventListener('touchend', (e) => {
+                    e.preventDefault();
+                    handlePlantCardClick(type, config.cost);
+                });
+
+                selectionBar.appendChild(card);
+            });
+        }
+
+        function updateUI() {
+            pointsDisplay.textContent = gameState.points;
+            waveDisplay.textContent = gameState.currentWave;
+        }
+
+        function updatePlantCards() {
+            const now = Date.now();
+
+            document.querySelectorAll('.plant-card').forEach(card => {
+                const type = card.dataset.type;
+                const cost = parseInt(card.dataset.cost);
+                const cooldownEnd = gameState.cooldowns[type] || 0;
+                const isOnCooldown = now < cooldownEnd;
+                const canAfford = gameState.points >= cost;
+
+                card.classList.toggle('disabled', !canAfford || isOnCooldown);
+                card.classList.toggle('selected', type === gameState.selectedPlant);
+
+                const overlay = card.querySelector('.cooldown-overlay');
+                if (isOnCooldown) {
+                    const remaining = Math.ceil((cooldownEnd - now) / 1000);
+                    overlay.textContent = remaining + 's';
+                    overlay.classList.remove('hidden');
+                } else {
+                    overlay.classList.add('hidden');
+                }
+            });
+
+            shovelCard.classList.toggle('selected', gameState.shovelMode);
+
+            document.querySelectorAll('.cell').forEach(cell => {
+                cell.classList.toggle('shovel-target', gameState.shovelMode && cell.classList.contains('occupied'));
+            });
+        }
+
+        function startCooldownTimer() {
+            const timer = setInterval(() => {
+                if (!gameState.isRunning) {
+                    clearInterval(timer);
+                    return;
+                }
+                updatePlantCards();
+            }, 100);
+            gameState.intervals.push(timer);
+        }
+
+        // ==================== 事件處理 ====================
+        shovelCard.addEventListener('click', (e) => {
+            e.preventDefault();
+            toggleShovel();
+        });
+        shovelCard.addEventListener('touchend', (e) => {
+            e.preventDefault();
+            toggleShovel();
+        });
+
+        function toggleShovel() {
+            gameState.shovelMode = !gameState.shovelMode;
+            if (gameState.shovelMode) {
+                gameState.selectedPlant = null;
+            }
+            updatePlantCards();
+        }
+
+        function handlePlantCardClick(type, cost) {
+            const now = Date.now();
+            const cooldownEnd = gameState.cooldowns[type] || 0;
+
+            if (gameState.points >= cost && now >= cooldownEnd) {
+                gameState.shovelMode = false;
+                gameState.selectedPlant = (gameState.selectedPlant === type) ? null : type;
+                updatePlantCards();
+            }
+        }
+
+        function handleCellClick(row, col, cell) {
+            if (!gameState.isRunning) return;
+
+            if (gameState.shovelMode && cell.classList.contains('occupied')) {
+                const plant = gameState.plants.find(p => p.row === row && p.col === col);
+                if (plant) {
+                    const config = CONFIG.PLANTS[plant.type];
+                    const refund = Math.floor(config.cost * CONFIG.SHOVEL_REFUND);
+                    gameState.points += refund;
+                    showMoneyEffect(cell, '+' + refund);
+                    showRemoveEffect(cell);
+                    removePlant(plant);
+                    gameState.shovelMode = false;
+                    updateUI();
+                    updatePlantCards();
+                }
+                return;
+            }
+
+            if (!gameState.selectedPlant) return;
+            if (cell.classList.contains('occupied')) return;
+
+            const plantConfig = CONFIG.PLANTS[gameState.selectedPlant];
+            const now = Date.now();
+
+            if (gameState.points < plantConfig.cost) return;
+            if (now < (gameState.cooldowns[gameState.selectedPlant] || 0)) return;
+
+            gameState.points -= plantConfig.cost;
+            gameState.cooldowns[gameState.selectedPlant] = now + plantConfig.cooldown;
+
+            const plant = {
+                type: gameState.selectedPlant,
+                row: row,
+                col: col,
+                hp: plantConfig.hp,
+                maxHp: plantConfig.hp,
+                lastAction: Date.now(),
+                element: cell
+            };
+
+            gameState.plants.push(plant);
+            updatePlantCell(plant);
+            cell.classList.add('occupied');
+
+            gameState.selectedPlant = null;
+            updateUI();
+            updatePlantCards();
+        }
+
+        function updatePlantCell(plant) {
+            const config = CONFIG.PLANTS[plant.type];
+            const hpPercent = (plant.hp / plant.maxHp) * 100;
+            const cellSize = CONFIG.CELL_SIZE;
+            let hpClass = '';
+            if (hpPercent <= 30) hpClass = 'low';
+            else if (hpPercent <= 60) hpClass = 'medium';
+
+            plant.element.innerHTML = `
+                <div class="plant-wrapper">
+                    <span class="plant">${config.emoji}</span>
+                    <div class="hp-bar" style="width:${cellSize * 0.7}px;height:${Math.max(3, cellSize * 0.08)}px">
+                        <div class="hp-bar-fill ${hpClass}" style="width:${hpPercent}%"></div>
+                    </div>
+                </div>
+            `;
+        }
+
+        function showMoneyEffect(cell, text) {
+            const cellSize = CONFIG.CELL_SIZE;
+            const effect = document.createElement('div');
+            effect.className = 'money-effect';
+            effect.textContent = text;
+            effect.style.fontSize = `${cellSize * 0.3}px`;
+            effect.style.left = `${parseInt(cell.dataset.col) * cellSize + cellSize * 0.3}px`;
+            effect.style.top = `${parseInt(cell.dataset.row) * cellSize}px`;
+            gameContainer.appendChild(effect);
+            setTimeout(() => effect.remove(), 1000);
+        }
+
+        function showRemoveEffect(cell) {
+            const cellSize = CONFIG.CELL_SIZE;
+            const effect = document.createElement('div');
+            effect.className = 'remove-effect';
+            effect.textContent = '💨';
+            effect.style.fontSize = `${cellSize * 0.5}px`;
+            effect.style.left = `${parseInt(cell.dataset.col) * cellSize + cellSize * 0.3}px`;
+            effect.style.top = `${parseInt(cell.dataset.row) * cellSize + cellSize * 0.3}px`;
+            gameContainer.appendChild(effect);
+            setTimeout(() => effect.remove(), 500);
+        }
+
+        // ==================== 遊戲邏輯 ====================
+        function startGame() {
+            if (gameState.isRunning) return;
+
+            gameState.isRunning = true;
+            startBtn.disabled = true;
+            startCooldownTimer();
+
+            const gameLoop = setInterval(() => {
+                if (!gameState.isRunning) {
+                    clearInterval(gameLoop);
+                    return;
+                }
+                updatePlants();
+                updateZombies();
+                updateBullets();
+                checkCollisions();
+                checkGameState();
+            }, 50);
+
+            gameState.intervals.push(gameLoop);
+
+            spawnWave();
+            const waveInterval = setInterval(() => {
+                if (!gameState.isRunning) {
+                    clearInterval(waveInterval);
+                    return;
+                }
+                spawnWave();
+            }, CONFIG.WAVE_INTERVAL);
+
+            gameState.intervals.push(waveInterval);
+        }
+
+        function spawnWave() {
+            if (gameState.currentWave >= CONFIG.TOTAL_WAVES) return;
+
+            gameState.currentWave++;
+            updateUI();
+
+            const wave = gameState.currentWave;
+
+            if (wave === CONFIG.TOTAL_WAVES && !gameState.bossSpawned) {
+                gameState.bossSpawned = true;
+                showBossWarning();
+                setTimeout(() => {
+                    if (gameState.isRunning) spawnZombie('boss');
+                }, 2000);
+            }
+
+            const zombieCount = 3 + wave * 2;
+
+            for (let i = 0; i < zombieCount; i++) {
+                setTimeout(() => {
+                    if (!gameState.isRunning) return;
+                    let type = 'normal';
+                    const rand = Math.random();
+                    if (wave >= 4 && rand < 0.25) type = 'tank';
+                    else if (wave >= 2 && rand < 0.4) type = 'fast';
+                    spawnZombie(type);
+                }, i * 1500);
+            }
+        }
+
+        function showBossWarning() {
+            const warning = document.createElement('div');
+            warning.className = 'boss-warning';
+            warning.textContent = '⚠️ 殭屍王來襲！⚠️';
+            document.body.appendChild(warning);
+            setTimeout(() => warning.remove(), 2000);
+        }
+
+        function spawnZombie(type) {
+            const config = CONFIG.ZOMBIES[type];
+            const cellSize = CONFIG.CELL_SIZE;
+            const row = Math.floor(Math.random() * CONFIG.GRID_ROWS);
+
+            const zombieEl = document.createElement('div');
+            zombieEl.className = 'zombie' + (config.isBoss ? ' boss' : '');
+
+            const fontSize = config.isBoss ? cellSize * 0.7 : cellSize * 0.5;
+            const hpBarWidth = config.isBoss ? cellSize * 0.8 : cellSize * 0.5;
+            const hpBarHeight = config.isBoss ? 6 : 4;
+
+            zombieEl.innerHTML = `
+                <span class="zombie-sprite" style="font-size:${fontSize}px">${config.emoji}</span>
+                <div class="hp-bar" style="width:${hpBarWidth}px;height:${hpBarHeight}px;margin-top:-3px">
+                    <div class="hp-bar-fill" style="width:100%"></div>
+                </div>
+            `;
+
+            zombieEl.style.top = `${row * cellSize + 5}px`;
+            zombieEl.style.left = `${CONFIG.GRID_COLS * cellSize + 20}px`;
+
+            gameContainer.appendChild(zombieEl);
+
+            gameState.zombies.push({
+                type, row,
+                x: CONFIG.GRID_COLS * cellSize + 20,
+                hp: config.hp,
+                maxHp: config.hp,
+                speed: config.speed,
+                baseSpeed: config.speed,
+                damage: config.damage,
+                reward: config.reward,
+                element: zombieEl,
+                isAttacking: false,
+                lastAttack: 0,
+                slowedUntil: 0,
+                frozenUntil: 0,
+                isBoss: config.isBoss || false
+            });
+        }
+
+        function updateZombieHpBar(zombie) {
+            const hpPercent = (zombie.hp / zombie.maxHp) * 100;
+            const hpBar = zombie.element.querySelector('.hp-bar-fill');
+            if (hpBar) {
+                hpBar.style.width = hpPercent + '%';
+                if (!zombie.isBoss) {
+                    if (hpPercent <= 30) hpBar.className = 'hp-bar-fill low';
+                    else if (hpPercent <= 60) hpBar.className = 'hp-bar-fill medium';
+                    else hpBar.className = 'hp-bar-fill';
+                }
+            }
+        }
+
+        function updatePlants() {
+            const now = Date.now();
+            const cellSize = CONFIG.CELL_SIZE;
+
+            gameState.plants.forEach(plant => {
+                const config = CONFIG.PLANTS[plant.type];
+
+                if (plant.type === 'sunflower') {
+                    if (now - plant.lastAction >= config.produceInterval) {
+                        gameState.points += config.produceAmount;
+                        plant.lastAction = now;
+                        updateUI();
+                        updatePlantCards();
+                        animatePlant(plant);
+                        showMoneyEffect(plant.element, '+' + config.produceAmount);
+                    }
+                }
+
+                if (plant.type === 'medic') {
+                    if (now - plant.lastAction >= config.healInterval) {
+                        plant.lastAction = now;
+                        healNearbyPlants(plant, config);
+                        animatePlant(plant);
+                    }
+                }
+
+                if (plant.type === 'bomb') {
+                    const nearbyZombie = gameState.zombies.find(z =>
+                        z.row === plant.row &&
+                        Math.abs((plant.col + 0.5) * cellSize - z.x) < cellSize * 0.7
+                    );
+                    if (nearbyZombie) {
+                        explodeBomb(plant, config);
+                        return;
+                    }
+                }
+
+                if (config.damage && config.range && now - plant.lastAction >= config.attackInterval) {
+                    const hasTarget = gameState.zombies.some(z => {
+                        if (config.range === 'row' || config.range === 'pierce') {
+                            return z.row === plant.row && z.x > plant.col * cellSize;
+                        } else if (config.range === 'area') {
+                            return Math.abs(z.row - plant.row) <= 1 &&
+                                   z.x > (plant.col - 1) * cellSize &&
+                                   z.x < (plant.col + 3) * cellSize;
+                        }
+                        return false;
+                    });
+
+                    if (hasTarget) {
+                        plant.lastAction = now;
+
+                        if (config.range === 'area') {
+                            gameState.zombies.forEach(zombie => {
+                                if (Math.abs(zombie.row - plant.row) <= 1 &&
+                                    zombie.x > (plant.col - 1) * cellSize &&
+                                    zombie.x < (plant.col + 3) * cellSize) {
+                                    zombie.hp -= config.damage;
+                                    updateZombieHpBar(zombie);
+                                    const sprite = zombie.element.querySelector('.zombie-sprite');
+                                    if (sprite) {
+                                        sprite.style.filter = 'brightness(2)';
+                                        setTimeout(() => { if (sprite) sprite.style.filter = ''; }, 200);
+                                    }
+                                }
+                            });
+                        } else {
+                            createBullet(plant, config);
+                        }
+                        animatePlant(plant);
+                    }
+                }
+            });
+        }
+
+        function animatePlant(plant) {
+            const plantSpan = plant.element.querySelector('.plant');
+            if (plantSpan) {
+                plantSpan.classList.add('attacking');
+                setTimeout(() => plantSpan.classList.remove('attacking'), 300);
+            }
+        }
+
+        function healNearbyPlants(medic, config) {
+            const cellSize = CONFIG.CELL_SIZE;
+            gameState.plants.forEach(plant => {
+                if (plant === medic) return;
+                const rowDist = Math.abs(plant.row - medic.row);
+                const colDist = Math.abs(plant.col - medic.col);
+                if (rowDist <= config.healRange && colDist <= config.healRange) {
+                    const plantConfig = CONFIG.PLANTS[plant.type];
+                    const oldHp = plant.hp;
+                    plant.hp = Math.min(plant.hp + config.healAmount, plantConfig.hp);
+
+                    if (plant.hp > oldHp) {
+                        updatePlantCell(plant);
+                        const healEffect = document.createElement('div');
+                        healEffect.className = 'heal-effect';
+                        healEffect.textContent = '+❤️';
+                        healEffect.style.fontSize = `${cellSize * 0.35}px`;
+                        healEffect.style.left = `${plant.col * cellSize + cellSize * 0.3}px`;
+                        healEffect.style.top = `${plant.row * cellSize}px`;
+                        gameContainer.appendChild(healEffect);
+                        setTimeout(() => healEffect.remove(), 1000);
+                    }
+                }
+            });
+        }
+
+        function explodeBomb(plant, config) {
+            const cellSize = CONFIG.CELL_SIZE;
+            gameState.zombies.forEach(zombie => {
+                const rowDist = Math.abs(zombie.row - plant.row);
+                const xDist = Math.abs(zombie.x - (plant.col + 0.5) * cellSize);
+                if (rowDist <= config.explodeRange && xDist < cellSize * 2) {
+                    zombie.hp -= config.damage;
+                    updateZombieHpBar(zombie);
+                    const sprite = zombie.element.querySelector('.zombie-sprite');
+                    if (sprite) {
+                        sprite.style.filter = 'brightness(3)';
+                        setTimeout(() => { if (sprite) sprite.style.filter = ''; }, 300);
+                    }
+                }
+            });
+
+            const effect = document.createElement('div');
+            effect.className = 'remove-effect';
+            effect.textContent = '💥';
+            effect.style.fontSize = `${cellSize * 0.8}px`;
+            effect.style.left = `${plant.col * cellSize + cellSize * 0.1}px`;
+            effect.style.top = `${plant.row * cellSize + cellSize * 0.1}px`;
+            gameContainer.appendChild(effect);
+            setTimeout(() => effect.remove(), 500);
+
+            removePlant(plant);
+        }
+
+        function createBullet(plant, config) {
+            const cellSize = CONFIG.CELL_SIZE;
+            const bulletEl = document.createElement('div');
+            bulletEl.className = 'bullet';
+            bulletEl.textContent = config.bulletEmoji;
+            bulletEl.style.fontSize = `${cellSize * 0.3}px`;
+            bulletEl.style.top = `${plant.row * cellSize + cellSize * 0.3}px`;
+            bulletEl.style.left = `${(plant.col + 1) * cellSize}px`;
+
+            gameContainer.appendChild(bulletEl);
+
+            gameState.bullets.push({
+                row: plant.row,
+                x: (plant.col + 1) * cellSize,
+                damage: config.damage,
+                element: bulletEl,
+                pierce: config.range === 'pierce',
+                slowEffect: config.slowEffect,
+                slowDuration: config.slowDuration,
+                freezeDuration: config.freezeDuration
+            });
+        }
+
+        function updateZombies() {
+            const now = Date.now();
+            const cellSize = CONFIG.CELL_SIZE;
+
+            gameState.zombies.forEach(zombie => {
+                if (zombie.frozenUntil > now) {
+                    zombie.element.classList.add('frozen');
+                    zombie.element.classList.remove('slowed');
+                    return;
+                } else {
+                    zombie.element.classList.remove('frozen');
+                }
+
+                if (zombie.slowedUntil > now) {
+                    zombie.element.classList.add('slowed');
+                    zombie.speed = zombie.baseSpeed * 0.5;
+                } else {
+                    zombie.element.classList.remove('slowed');
+                    zombie.speed = zombie.baseSpeed;
+                }
+
+                const targetPlant = gameState.plants.find(p =>
+                    p.row === zombie.row &&
+                    Math.abs((p.col + 0.5) * cellSize - zombie.x) < cellSize * 0.35
+                );
+
+                if (targetPlant) {
+                    zombie.isAttacking = true;
+                    if (now - zombie.lastAttack >= 1000) {
+                        targetPlant.hp -= zombie.damage;
+                        zombie.lastAttack = now;
+                        updatePlantCell(targetPlant);
+                        zombie.element.style.transform = 'scale(1.1)';
+                        setTimeout(() => {
+                            if (zombie.element) zombie.element.style.transform = '';
+                        }, 200);
+                        if (targetPlant.hp <= 0) removePlant(targetPlant);
+                    }
+                } else {
+                    zombie.isAttacking = false;
+                    zombie.x -= zombie.speed;
+                    zombie.element.style.left = `${zombie.x}px`;
+                }
+            });
+
+            gameState.zombies = gameState.zombies.filter(zombie => {
+                if (zombie.hp <= 0) {
+                    gameState.points += zombie.reward;
+                    const cellSize = CONFIG.CELL_SIZE;
+                    showMoneyEffect({ dataset: { col: Math.floor(zombie.x / cellSize), row: zombie.row } }, '+' + zombie.reward);
+                    updateUI();
+                    updatePlantCards();
+                    zombie.element.remove();
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function updateBullets() {
+            const cellSize = CONFIG.CELL_SIZE;
+            const bulletSpeed = Math.max(5, cellSize * 0.15);
+
+            gameState.bullets.forEach(bullet => {
+                bullet.x += bulletSpeed;
+                bullet.element.style.left = `${bullet.x}px`;
+            });
+
+            gameState.bullets = gameState.bullets.filter(bullet => {
+                if (bullet.x > CONFIG.GRID_COLS * cellSize + 50) {
+                    bullet.element.remove();
+                    return false;
+                }
+                return true;
+            });
+        }
+
+        function checkCollisions() {
+            const cellSize = CONFIG.CELL_SIZE;
+            const hitRange = cellSize * 0.4;
+
+            gameState.bullets = gameState.bullets.filter(bullet => {
+                for (let zombie of gameState.zombies) {
+                    if (zombie.row === bullet.row && Math.abs(zombie.x - bullet.x) < hitRange) {
+                        zombie.hp -= bullet.damage;
+                        updateZombieHpBar(zombie);
+
+                        if (bullet.slowEffect) zombie.slowedUntil = Date.now() + bullet.slowDuration;
+                        if (bullet.freezeDuration) zombie.frozenUntil = Date.now() + bullet.freezeDuration;
+
+                        if (!bullet.pierce) {
+                            bullet.element.remove();
+                            return false;
+                        }
+                    }
+                }
+                return true;
+            });
+        }
+
+        function removePlant(plant) {
+            const index = gameState.plants.indexOf(plant);
+            if (index > -1) {
+                gameState.plants.splice(index, 1);
+                plant.element.innerHTML = '';
+                plant.element.classList.remove('occupied');
+            }
+        }
+
+        function checkGameState() {
+            for (let zombie of gameState.zombies) {
+                if (zombie.x < 0) {
+                    endGame(false);
+                    return;
+                }
+            }
+
+            if (gameState.currentWave >= CONFIG.TOTAL_WAVES && gameState.zombies.length === 0) {
+                setTimeout(() => {
+                    if (gameState.isRunning && gameState.zombies.length === 0) {
+                        endGame(true);
+                    }
+                }, 3000);
+            }
+        }
+
+        function endGame(isWin) {
+            gameState.isRunning = false;
+            gameState.intervals.forEach(interval => clearInterval(interval));
+
+            gameOverContent.className = isWin ? 'win' : 'lose';
+            resultText.textContent = isWin ? '🎉 勝利！' : '💀 失敗...';
+            resultMessage.textContent = isWin ?
+                '你成功保護了醫院！植物人們是真正的英雄！' :
+                '殭屍入侵了醫院...下次會更好的！';
+            gameOverScreen.classList.add('show');
+        }
+
+        // ==================== 按鈕事件 ====================
+        startBtn.addEventListener('click', startGame);
+        startBtn.addEventListener('touchend', (e) => { e.preventDefault(); startGame(); });
+
+        function restartGame() {
+            gameState.intervals.forEach(interval => clearInterval(interval));
+            gameState.zombies.forEach(z => z.element.remove());
+            gameState.bullets.forEach(b => b.element.remove());
+            document.querySelectorAll('.boss-warning, .heal-effect, .money-effect, .remove-effect').forEach(el => el.remove());
+            gameOverScreen.classList.remove('show');
+            startBtn.disabled = false;
+            initGame();
+        }
+
+        restartBtn.addEventListener('click', restartGame);
+        restartBtn.addEventListener('touchend', (e) => { e.preventDefault(); restartGame(); });
+        playAgainBtn.addEventListener('click', restartGame);
+        playAgainBtn.addEventListener('touchend', (e) => { e.preventDefault(); restartGame(); });
+
+        // ==================== 視窗大小改變 ====================
+        let resizeTimeout;
+        window.addEventListener('resize', () => {
+            clearTimeout(resizeTimeout);
+            resizeTimeout = setTimeout(() => {
+                if (!gameState.isRunning) {
+                    initGame();
+                }
+            }, 250);
+        });
+
+        // ==================== 啟動遊戲 ====================
+        initGame();
+    </script>
+</body>
+</html>
