@@ -82,6 +82,7 @@
             overflow-y: hidden;
             -webkit-overflow-scrolling: touch;
             margin-bottom: 10px;
+            text-align: center;
         }
 
         #game-container {
@@ -375,6 +376,19 @@
             color: white;
         }
 
+        #start-btn:disabled,
+        #restart-btn:disabled {
+            background: #bbb;
+            color: #eee;
+            cursor: not-allowed;
+            opacity: 0.6;
+        }
+
+        #start-btn:disabled:active,
+        #restart-btn:disabled:active {
+            transform: none;
+        }
+
         /* 遊戲結束畫面 */
         #game-over {
             position: fixed;
@@ -421,6 +435,108 @@
 
         .win h2 { color: #27ae60; }
         .lose h2 { color: #c0392b; }
+
+        /* 開始畫面 */
+        #start-screen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0,0,0,0.85);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            z-index: 150;
+            padding: 20px;
+        }
+
+        #start-screen.hidden {
+            display: none;
+        }
+
+        #start-screen-content {
+            background: white;
+            padding: clamp(20px, 4vw, 40px);
+            border-radius: 20px;
+            text-align: center;
+            animation: popIn 0.5s ease-out;
+            max-width: 520px;
+            width: 90vw;
+        }
+
+        #start-screen-content h2 {
+            font-size: clamp(1.5em, 5vw, 2.5em);
+            color: #2c5d63;
+            margin-bottom: 10px;
+        }
+
+        #start-screen-content .story {
+            font-size: clamp(0.8em, 2.5vw, 1em);
+            color: #555;
+            line-height: 1.6;
+            margin-bottom: 8px;
+        }
+
+        #start-screen-content .how-to {
+            font-size: clamp(0.75em, 2.2vw, 0.9em);
+            color: #777;
+            line-height: 1.5;
+            margin-bottom: 18px;
+            text-align: left;
+            padding: 0 10px;
+        }
+
+        .difficulty-label {
+            font-size: clamp(0.9em, 3vw, 1.1em);
+            font-weight: bold;
+            color: #333;
+            margin-bottom: 12px;
+        }
+
+        .difficulty-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+
+        .diff-btn {
+            padding: 12px 20px;
+            font-size: clamp(0.85em, 2.8vw, 1em);
+            border: 2px solid transparent;
+            border-radius: 12px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.2s;
+            color: white;
+            min-width: 120px;
+            touch-action: manipulation;
+        }
+
+        .diff-btn:active {
+            transform: scale(0.95);
+        }
+
+        .diff-btn.easy {
+            background: linear-gradient(145deg, #27ae60, #2ecc71);
+        }
+
+        .diff-btn.normal {
+            background: linear-gradient(145deg, #2980b9, #3498db);
+        }
+
+        .diff-btn.hard {
+            background: linear-gradient(145deg, #c0392b, #e74c3c);
+        }
+
+        .diff-btn .diff-desc {
+            display: block;
+            font-size: 0.75em;
+            font-weight: normal;
+            opacity: 0.9;
+            margin-top: 4px;
+        }
 
         /* 說明 - 手機上隱藏 */
         .instructions {
@@ -642,6 +758,38 @@
         </div>
     </div>
 
+    <div id="start-screen">
+        <div id="start-screen-content">
+            <h2>🏥 植物人大戰殭屍 🧟</h2>
+            <p class="story">
+                深夜的市立醫院突然停電，殭屍從四面八方湧入！<br>
+                被遺忘在病房裡的植物人們，竟然覺醒了神秘力量...<br>
+                他們是醫院最後的防線！
+            </p>
+            <p class="how-to">
+                🎯 <strong>目標：</strong>阻止殭屍到達左側，撐過 7 波即可獲勝<br>
+                🛏️ <strong>操作：</strong>選擇角色卡 → 點格子放置<br>
+                🪏 <strong>鏟子：</strong>移除植物人，回收 50% 費用<br>
+                📱 <strong>提示：</strong>手機建議橫向遊玩
+            </p>
+            <p class="difficulty-label">選擇難度</p>
+            <div class="difficulty-buttons">
+                <button class="diff-btn easy" data-difficulty="easy">
+                    😊 簡單
+                    <span class="diff-desc">金錢 300 · 殭屍較弱</span>
+                </button>
+                <button class="diff-btn normal" data-difficulty="normal">
+                    😐 普通
+                    <span class="diff-desc">金錢 200 · 標準挑戰</span>
+                </button>
+                <button class="diff-btn hard" data-difficulty="hard">
+                    💀 困難
+                    <span class="diff-desc">金錢 150 · 殭屍更強更多</span>
+                </button>
+            </div>
+        </div>
+    </div>
+
     <script>
         // ==================== 動態計算尺寸 ====================
         function calculateSizes() {
@@ -802,6 +950,14 @@
             }
         };
 
+        // ==================== 難度倍率 ====================
+        let difficultyModifier = {
+            pointsMult: 1,
+            hpMult: 1,
+            speedMult: 1,
+            extraZombies: 0
+        };
+
         // ==================== 遊戲狀態 ====================
         let gameState = {
             isRunning: false,
@@ -831,6 +987,7 @@
         const playAgainBtn = document.getElementById('play-again-btn');
         const selectionBar = document.getElementById('selection-bar');
         const shovelCard = document.getElementById('shovel-card');
+        const startScreen = document.getElementById('start-screen');
 
         // ==================== 初始化 ====================
         function initGame() {
@@ -871,7 +1028,7 @@
 
             gameState = {
                 isRunning: false,
-                points: CONFIG.INITIAL_POINTS,
+                points: Math.round(CONFIG.INITIAL_POINTS * difficultyModifier.pointsMult),
                 currentWave: 0,
                 selectedPlant: null,
                 shovelMode: false,
@@ -1095,7 +1252,32 @@
 
             gameState.isRunning = true;
             startBtn.disabled = true;
+            restartBtn.disabled = false;
             startCooldownTimer();
+
+            // 倒數提示
+            let countdown = 5;
+            const countdownEl = document.createElement('div');
+            countdownEl.style.cssText = `
+                position: fixed; top: 12px; left: 50%; transform: translateX(-50%);
+                background: rgba(0,0,0,0.75); color: #fff; padding: 10px 24px;
+                border-radius: 10px; font-size: clamp(0.9em, 3vw, 1.2em);
+                font-weight: bold; z-index: 50; white-space: nowrap;
+                text-shadow: 0 1px 4px rgba(0,0,0,0.4);
+            `;
+            countdownEl.textContent = `🏥 開始佈陣！${countdown} 秒後殭屍來襲...`;
+            document.body.appendChild(countdownEl);
+
+            const countdownTimer = setInterval(() => {
+                countdown--;
+                if (countdown <= 0) {
+                    clearInterval(countdownTimer);
+                    countdownEl.remove();
+                    return;
+                }
+                countdownEl.textContent = `🏥 開始佈陣！${countdown} 秒後殭屍來襲...`;
+            }, 1000);
+            gameState.intervals.push(countdownTimer);
 
             const gameLoop = setInterval(() => {
                 if (!gameState.isRunning) {
@@ -1111,16 +1293,19 @@
 
             gameState.intervals.push(gameLoop);
 
-            spawnWave();
-            const waveInterval = setInterval(() => {
-                if (!gameState.isRunning) {
-                    clearInterval(waveInterval);
-                    return;
-                }
+            const firstWaveDelay = setTimeout(() => {
+                if (!gameState.isRunning) return;
                 spawnWave();
-            }, CONFIG.WAVE_INTERVAL);
-
-            gameState.intervals.push(waveInterval);
+                const waveInterval = setInterval(() => {
+                    if (!gameState.isRunning) {
+                        clearInterval(waveInterval);
+                        return;
+                    }
+                    spawnWave();
+                }, CONFIG.WAVE_INTERVAL);
+                gameState.intervals.push(waveInterval);
+            }, 5000);
+            gameState.intervals.push(firstWaveDelay);
         }
 
         function spawnWave() {
@@ -1139,7 +1324,7 @@
                 }, 2000);
             }
 
-            const zombieCount = 3 + wave * 2;
+            const zombieCount = 3 + wave * 2 + difficultyModifier.extraZombies;
 
             for (let i = 0; i < zombieCount; i++) {
                 setTimeout(() => {
@@ -1185,13 +1370,16 @@
 
             gameContainer.appendChild(zombieEl);
 
+            const modifiedHp = Math.round(config.hp * difficultyModifier.hpMult);
+            const modifiedSpeed = config.speed * difficultyModifier.speedMult;
+
             gameState.zombies.push({
                 type, row,
                 x: CONFIG.GRID_COLS * cellSize + 20,
-                hp: config.hp,
-                maxHp: config.hp,
-                speed: config.speed,
-                baseSpeed: config.speed,
+                hp: modifiedHp,
+                maxHp: modifiedHp,
+                speed: modifiedSpeed,
+                baseSpeed: modifiedSpeed,
                 damage: config.damage,
                 reward: config.reward,
                 element: zombieEl,
@@ -1525,13 +1713,34 @@
             document.querySelectorAll('.boss-warning, .heal-effect, .money-effect, .remove-effect').forEach(el => el.remove());
             gameOverScreen.classList.remove('show');
             startBtn.disabled = false;
+            restartBtn.disabled = true;
             initGame();
+            startScreen.classList.remove('hidden');
         }
 
         restartBtn.addEventListener('click', restartGame);
         restartBtn.addEventListener('touchend', (e) => { e.preventDefault(); restartGame(); });
         playAgainBtn.addEventListener('click', restartGame);
         playAgainBtn.addEventListener('touchend', (e) => { e.preventDefault(); restartGame(); });
+
+        // ==================== 難度選擇 ====================
+        document.querySelectorAll('.diff-btn').forEach(btn => {
+            function selectDifficulty(e) {
+                e.preventDefault();
+                const diff = btn.dataset.difficulty;
+                if (diff === 'easy') {
+                    difficultyModifier = { pointsMult: 1.5, hpMult: 0.7, speedMult: 0.8, extraZombies: 0 };
+                } else if (diff === 'hard') {
+                    difficultyModifier = { pointsMult: 0.75, hpMult: 1.5, speedMult: 1.3, extraZombies: 2 };
+                } else {
+                    difficultyModifier = { pointsMult: 1, hpMult: 1, speedMult: 1, extraZombies: 0 };
+                }
+                startScreen.classList.add('hidden');
+                initGame();
+            }
+            btn.addEventListener('click', selectDifficulty);
+            btn.addEventListener('touchend', selectDifficulty);
+        });
 
         // ==================== 視窗大小改變 ====================
         let resizeTimeout;
@@ -1545,6 +1754,7 @@
         });
 
         // ==================== 啟動遊戲 ====================
+        restartBtn.disabled = true;
         initGame();
     </script>
 </body>
